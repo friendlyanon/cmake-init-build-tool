@@ -1,0 +1,62 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches:
+    - master
+
+  pull_request:
+    branches:
+    - master
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        arch: [arm64, x64]
+
+    runs-on: windows-2022
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup env
+      id: native
+      run: |
+        Add-Content $env:GITHUB_ENV UseMultiToolTask=true
+        Add-Content $env:GITHUB_ENV EnforceProcessCountAcrossBuilds=true
+        $result = '1'
+        if ('${{ matrix.arch }}' -ceq 'x64') { $result = '' }
+        Add-Content $env:GITHUB_OUTPUT "bool=$result"
+
+    - name: Configure (Native)
+      if: steps.native.outputs.bool
+      run: cmake --preset=ci-windows -B build-native
+
+    - name: Build (Native)
+      if: steps.native.outputs.bool
+      run: cmake --build build-native --config Release -j 2 -t precompiler
+
+    - name: Install (Native)
+      if: steps.native.outputs.bool
+      run: >-
+        cmake --install build-native/tools/precompiler --config Release
+        --prefix prefix-native --component precompiler
+
+    - name: Configure
+      run: >-
+        $precompiler = Join-Path . prefix-native/bin/precompiler.exe -r -ea 0
+
+        cmake --preset=ci-windows-${{ matrix.arch }}
+        "-DPRECOMPILER_EXECUTABLE=$precompiler"
+
+    - name: Build
+      run: cmake --build build --config Release -j 2
+
+    - name: Install
+      run: cmake --install build --config Release --prefix prefix
+
+    - name: Test
+      if: "!steps.native.outputs.bool"
+      working-directory: build
+      run: ctest --output-on-failure --no-tests=error -C Release -j 2

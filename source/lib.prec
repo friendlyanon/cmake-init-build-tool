@@ -1,0 +1,4 @@
+auto get_data() -> std::string
+{
+  return data;
+}
