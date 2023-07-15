@@ -50,7 +50,10 @@ auto parse_args(std::vector<std::string_view> const& args) -> parsed_args
     } else if (type == "include"sv) {
       parsed_args.includes.emplace_back(fs::canonical(arg));
     } else {
-      throw std::system_error(bad_arg, "'" + std::string(type) + "' unknown");
+      auto message = "'"s;
+      message += type;
+      message += "' unknown"sv;
+      throw std::system_error(bad_arg, message);
     }
   }
 
@@ -67,9 +70,9 @@ auto parse_args(std::vector<std::string_view> const& args) -> parsed_args
 auto make_output(parsed_args const& args) -> std::string
 {
   auto output = std::stringstream();
-  output << "input=" << args.input << "\noutput=" << args.output;
-  for (const auto& include : args.includes) {
-    output << "\ninclude=" << include;
+  output << "input="sv << args.input << "\noutput="sv << args.output;
+  for (auto const& include : args.includes) {
+    output << "\ninclude="sv << include;
   }
   output << '\n';
   return output.str();
@@ -82,9 +85,9 @@ void try_main(std::vector<std::string_view> const& args)
   std::cerr << output;  // be noisy
 
   std::ofstream(parsed_args.output, std::ios::binary)
-      << "#include <string>\n\nusing namespace "
-         "std::string_literals;\n\nnamespace\n{\n\nauto const data = R\"prec("
-      << output << ")prec\"s;\n\n}\n\n"
+      << "#include <string>\n\nusing namespace std::string_literals;\n\n"
+         "namespace\n{\n\nauto const data = R\"prec("sv
+      << output << ")prec\"s;\n\n}\n\n"sv
       << std::ifstream(parsed_args.input, std::ios::binary).rdbuf();
 }
 
@@ -93,7 +96,7 @@ constexpr int ex_usage = 64;
 auto usage() -> int
 {
   std::cerr << "Usage: precompiler input=<path> output=<path> "
-               "[include=<path>]...\n";
+               "[include=<path>]...\n"sv;
   return ex_usage;
 }
 
