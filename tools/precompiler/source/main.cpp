@@ -23,7 +23,10 @@ struct parsed_args
   std::vector<fs::path> includes;
 };
 
-auto bad_arg = std::make_error_code(std::errc::invalid_argument);
+class bad_argument_error : public std::runtime_error
+{
+  using runtime_error::runtime_error;
+};
 
 auto parse_args(std::vector<std::string_view> const& args) -> parsed_args
 {
@@ -32,7 +35,9 @@ auto parse_args(std::vector<std::string_view> const& args) -> parsed_args
   for (auto arg : args) {
     auto index = arg.find('=');
     if (index == std::string_view::npos) {
-      throw std::system_error(bad_arg, std::string(arg));
+      auto message = "Bad argument: "s;
+      message += arg;
+      throw bad_argument_error(message);
     }
 
     auto type = arg;
@@ -50,18 +55,18 @@ auto parse_args(std::vector<std::string_view> const& args) -> parsed_args
     } else if (type == "include"sv) {
       parsed_args.includes.emplace_back(fs::canonical(arg));
     } else {
-      auto message = "'"s;
+      auto message = "Option '"s;
       message += type;
       message += "' unknown"sv;
-      throw std::system_error(bad_arg, message);
+      throw bad_argument_error(message);
     }
   }
 
   if (parsed_args.input == fs::path()) {
-    throw std::system_error(bad_arg, "'input=<path>' is required");
+    throw bad_argument_error("'input=<path>' is required");
   }
   if (parsed_args.output == fs::path()) {
-    throw std::system_error(bad_arg, "'output=<path>' is required");
+    throw bad_argument_error("'output=<path>' is required");
   }
 
   return parsed_args;
@@ -116,9 +121,9 @@ auto main(int argc, char const* argv[]) -> int
     }
 
     try_main(args);
-  } catch (std::system_error const& e) {
+  } catch (bad_argument_error const& e) {
     std::cerr << e.what() << '\n';
-    return e.code() == std::errc::invalid_argument ? usage() : 1;
+    return usage();
   } catch (std::exception const& e) {
     std::cerr << e.what() << '\n';
     return 1;
